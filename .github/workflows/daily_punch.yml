@@ -1,4 +1,4 @@
-name: 洛谷+掘金自动打卡 (含邮件日报)
+name: 洛谷自动打卡
 
 # 出于某些原因，暂时暂停该脚本自动化。
 
@@ -49,14 +49,6 @@ jobs:
           echo "==============================================="
           # || echo 防止洛谷报错导致掘金不跑
           python main.py || echo "❌ 洛谷脚本执行异常"
-
-          # 如果不需要掘金打卡请删除以下内容。
-          
-          echo -e "\n\n"
-          echo "==============================================="
-          echo "🚀 2. 开始执行 掘金打卡 (juejin.py)"
-          echo "==============================================="
-          python juejin.py || echo "❌ 掘金脚本执行异常"
           
         } 2>&1 | tee log.txt
         # 2>&1 | tee log.txt 的意思是：把屏幕上显示的字，同时保存一份到 log.txt
@@ -92,36 +84,3 @@ jobs:
     - name: Get Current Date
       id: date
       run: echo "date=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
-
-    # 第七步：发送邮件 (整合了 PR 的功能，感谢贡献)
-    - name: Send Email
-      if: steps.read_log.outputs.log_exists == 'true'
-      uses: dawidd6/action-send-mail@v3
-      with:
-        # 👇 1. 修改邮件服务器 (QQ邮箱用 smtp.qq.com)
-        server_address: smtp.qq.com
-        server_port: 465
-        
-        # 👇 2. 确保 Secrets 里配好了这两个
-        username: ${{ secrets.EMAIL_USERNAME }}
-        password: ${{ secrets.EMAIL_PASSWORD }}
-        
-        subject: '每日打卡日报 - ${{ github.repository }}'
-        
-        # 邮件正文：直接显示刚才捕获的日志
-        body: |
-          自动打卡任务执行报告
-          
-          运行时间: ${{ steps.date.outputs.date }}
-          
-          详细日志：
-          --------------------------------------------------
-          ${{ steps.read_log.outputs.log_content }}
-          --------------------------------------------------
-          
-          (本邮件由 GitHub Actions 自动发送)
-        
-        # 👇 3. 修改收件人 (改成你自己的！)
-        to: 3918967988@qq.com # 请将此处改成你自己的邮箱。
-        from: 打卡助手 <${{ secrets.EMAIL_USERNAME }}>
-        content_type: text/plain

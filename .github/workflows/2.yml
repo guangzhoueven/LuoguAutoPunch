@@ -1,0 +1,87 @@
+name: 洛谷自动打卡
+
+# 出于某些原因，暂时暂停该脚本自动化。
+
+on:
+  # 1. 定时触发
+  schedule:
+    # 北京时间 08:00
+    - cron: '0 0 * * *'
+    # 北京时间 20:00 (补签)
+    - cron: '0 12 * * *'
+
+  # 2. 允许手动触发
+  workflow_dispatch:
+
+jobs:
+  punch:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # 第一步：下载代码
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # 第二步：安装 Python
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    # 第三步：安装依赖 (保留了 Playwright，为了掘金)
+    - name: Install Dependencies
+      run: |
+        pip install -r requirements.txt
+        playwright install chromium
+
+    # 第四步：核心融合 (运行所有脚本 + 捕获日志)
+    - name: Run Scripts & Capture Log
+      id: punch-script
+      env:
+        # 注入所有的 Token/Cookie
+        LUOGU_COOKIE: ${{ secrets.LUOGU_COOKIE2 }}
+        JUEJIN_COOKIE: ${{ secrets.JUEJIN_COOKIE }}
+        PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+      run: |
+        # 使用 { ... } 包裹，将内部所有输出合并处理
+        {
+          echo "==============================================="
+          echo "🚀 1. 开始执行 洛谷打卡 (main.py)"
+          echo "==============================================="
+          # || echo 防止洛谷报错导致掘金不跑
+          python main.py || echo "❌ 洛谷脚本执行异常"
+          
+        } 2>&1 | tee log.txt
+        # 2>&1 | tee log.txt 的意思是：把屏幕上显示的字，同时保存一份到 log.txt
+
+    # 第五步：读取日志内容 (为发邮件做准备)
+    - name: Read log content
+      id: read_log
+      if: always() # 即使脚本报错，也要执行这步
+      run: |
+        if [ -f "log.txt" ]; then
+          # 读取日志前 50000 个字符
+          LOG_CONTENT=$(cat log.txt | head -c 50000)
+          # 写入输出变量
+          echo "log_content<<EOF" >> $GITHUB_OUTPUT
+          echo "$LOG_CONTENT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+          echo "log_exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "log_content=日志文件未生成" >> $GITHUB_OUTPUT
+          echo "log_exists=false" >> $GITHUB_OUTPUT
+        fi
+
+    # 第六步：上传日志文件 (方便在 GitHub 网页下载)
+    - name: Upload log file
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: punch-log
+        path: log.txt
+        retention-days: 7
+    
+    # 补充：时间获取。
+    - name: Get Current Date
+      id: date
+      run: echo "date=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
